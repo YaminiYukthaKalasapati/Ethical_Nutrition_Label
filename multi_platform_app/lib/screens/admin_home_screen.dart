@@ -24,13 +24,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     setState(() => _isLoading = true);
     try {
       final stats = await _dataService.getAdminSystemStats();
-      setState(() {
-        _stats = stats;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() {
+          _stats = stats;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error loading stats: $e')));
@@ -109,11 +111,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           colors: [Colors.purple.shade400, Colors.purple.shade600],
         ),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Color.fromRGBO(156, 39, 176, 0.3), // Purple with opacity
+            color: Color.fromRGBO(156, 39, 176, 0.3),
             blurRadius: 10,
-            offset: const Offset(0, 5),
+            offset: Offset(0, 5),
           ),
         ],
       ),
@@ -255,12 +257,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           () => Navigator.pushNamed(context, '/admin/analytics'),
         ),
         const SizedBox(height: 12),
+        // CHANGED THIS - Instead of Export Data, navigate to DNL Generator
         _buildActionCard(
-          'Export Data',
-          'Download all data as CSV',
-          Icons.download,
-          Colors.green,
-          () => Navigator.pushNamed(context, '/admin/export'),
+          'DNL Label Generator',
+          'Generate Digital Nutrition Labels',
+          Icons.label,
+          Colors.orange,
+          () => Navigator.pushNamed(context, '/admin/dnl'),
         ),
       ],
     );

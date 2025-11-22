@@ -1,261 +1,112 @@
+// This is an EXAMPLE of how your profile_screen.dart should look
+// Adjust based on your actual implementation
+
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/data_service.dart';
-import '../utils/constants.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _authService = AuthService();
-  final _dataService = DataService();
-
-  String? _userEmail;
-  String? _fullName;
-  int _submissionCount = 0;
-  bool _loading = true;
+  final DataService _dataService = DataService();
+  int _totalSubmissions = 0; // ADD THIS
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfile();
+    _loadData(); // CHANGE FROM _loadUserProfile to _loadData
   }
 
-  Future<void> _loadUserProfile() async {
-    final user = _authService.currentUser;
-    final email = user?.email ?? '';
-
+  // RENAME THIS METHOD
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
     try {
-      final data = await _dataService.getUserData(email);
-      setState(() {
-        _userEmail = email;
-        _fullName = user?.userMetadata?['full_name'] ?? 'Unknown';
-        _submissionCount = data.length;
-        _loading = false;
-      });
+      final submissions = await _dataService.getUserData();
+      if (mounted) {
+        setState(() {
+          _totalSubmissions = submissions.length;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _userEmail = email;
-        _fullName = user?.userMetadata?['full_name'] ?? 'Unknown';
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
-  }
-
-  Future<void> _signOut() async {
-    final confirmed = await _showLogoutDialog();
-    if (confirmed == true) {
-      await _authService.signOut();
-      if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-    }
-  }
-
-  Future<bool?> _showLogoutDialog() {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = Supabase.instance.client.auth.currentUser;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadUserProfile,
-              child: SingleChildScrollView(
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+              if (mounted) {
+                Navigator.pushReplacementNamed(context, '/');
+              }
+            },
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadData, // CHANGE FROM _loadUserProfile to _loadData
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: AppConstants.largePadding,
+                padding: const EdgeInsets.all(16),
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: AppConstants.maxContentWidth,
-                    ),
+                    constraints: const BoxConstraints(maxWidth: 600),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Profile header
+                        // User info card
                         Card(
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.teal.shade400,
-                                  Colors.teal.shade600,
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            padding: const EdgeInsets.all(24),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
                             child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CircleAvatar(
-                                  radius: 50,
-                                  backgroundColor: Colors.white,
-                                  child: Icon(
-                                    Icons.person,
-                                    size: 50,
-                                    color: Colors.teal.shade600,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  _fullName ?? 'User',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
+                                const Text(
+                                  'Account Information',
+                                  style: TextStyle(
+                                    fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _userEmail ?? 'Unknown',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 16,
+                                const SizedBox(height: 16),
+                                ListTile(
+                                  leading: const Icon(Icons.person),
+                                  title: const Text('Name'),
+                                  subtitle: Text(
+                                    user?.userMetadata?['full_name'] ?? 'N/A',
                                   ),
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.email),
+                                  title: const Text('Email'),
+                                  subtitle: Text(user?.email ?? 'N/A'),
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.assignment),
+                                  title: const Text('Total Submissions'),
+                                  subtitle: Text('$_totalSubmissions'),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Statistics
-                        Text(
-                          'Statistics',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.teal.shade900,
-                              ),
-                        ),
-                        const SizedBox(height: 12),
-                        Card(
-                          elevation: 2,
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.blue.shade100,
-                              child: Icon(Icons.assessment, color: Colors.blue),
-                            ),
-                            title: const Text('Total Submissions'),
-                            trailing: Text(
-                              _submissionCount.toString(),
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Quick actions
-                        Text(
-                          'Quick Actions',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.teal.shade900,
-                              ),
-                        ),
-                        const SizedBox(height: 12),
-                        Card(
-                          elevation: 2,
-                          child: Column(
-                            children: [
-                              ListTile(
-                                leading: Icon(Icons.home, color: Colors.teal),
-                                title: const Text('Go to Home'),
-                                trailing: const Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 16,
-                                ),
-                                onTap: () =>
-                                    Navigator.pushNamed(context, '/home'),
-                              ),
-                              const Divider(height: 1),
-                              ListTile(
-                                leading: Icon(
-                                  Icons.analytics,
-                                  color: Colors.purple,
-                                ),
-                                title: const Text('View Metrics'),
-                                trailing: const Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 16,
-                                ),
-                                onTap: () =>
-                                    Navigator.pushNamed(context, '/metrics'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Account section
-                        Text(
-                          'Account',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.teal.shade900,
-                              ),
-                        ),
-                        const SizedBox(height: 12),
-                        Card(
-                          elevation: 2,
-                          child: Column(
-                            children: [
-                              ListTile(
-                                leading: Icon(
-                                  Icons.info_outline,
-                                  color: Colors.blue,
-                                ),
-                                title: const Text('About'),
-                                trailing: const Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 16,
-                                ),
-                                onTap: _showAboutDialog,
-                              ),
-                              const Divider(height: 1),
-                              ListTile(
-                                leading: Icon(Icons.logout, color: Colors.red),
-                                title: const Text('Logout'),
-                                trailing: const Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 16,
-                                ),
-                                onTap: _signOut,
-                              ),
-                            ],
                           ),
                         ),
                       ],
@@ -263,43 +114,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
-            ),
-    );
-  }
-
-  void _showAboutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.analytics_outlined, color: Colors.teal),
-            const SizedBox(width: 12),
-            const Text('About'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              AppConstants.appName,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text('Version: ${AppConstants.appVersion}'),
-            const SizedBox(height: 16),
-            const Text(
-              'A comprehensive data collection tool for analyzing digital wellness metrics in mental health applications.',
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
       ),
     );
   }

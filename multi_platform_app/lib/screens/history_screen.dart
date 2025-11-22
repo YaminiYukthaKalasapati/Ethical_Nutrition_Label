@@ -36,7 +36,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     try {
       final email = _authService.currentUserEmail ?? '';
-      final data = await _dataService.getUserData(email);
+      final data = await _dataService.getUserData();
       setState(() {
         _submissions = data;
         _filteredSubmissions = data;
@@ -77,7 +77,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (confirmed != true) return;
 
     try {
-      await _dataService.deleteData(id);
+      await _dataService.deleteSubmission(id);
       _showSuccessSnackBar('Submission deleted successfully');
       _loadHistory();
     } catch (e) {

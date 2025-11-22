@@ -9,14 +9,14 @@ class CustomDropdown extends StatelessWidget {
   final IconData? prefixIcon;
 
   const CustomDropdown({
-    Key? key,
+    super.key,
     required this.labelText,
     required this.value,
     required this.items,
     required this.onChanged,
     this.validator,
     this.prefixIcon,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +28,7 @@ class CustomDropdown extends StatelessWidget {
         filled: true,
         fillColor: Colors.white,
       ),
-      value: value,
+      initialValue: value,
       items: items.map((item) {
         return DropdownMenuItem<String>(value: item, child: Text(item));
       }).toList(),

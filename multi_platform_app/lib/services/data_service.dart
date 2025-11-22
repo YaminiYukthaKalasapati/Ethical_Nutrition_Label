@@ -1,6 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/experiment_data.dart';
-import '../models/metrics_data.dart';
 
 class DataService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -9,7 +8,6 @@ class DataService {
   // USER DATA SUBMISSION
   // ================================================
 
-  /// Submit experiment data
   Future<void> submitData(ExperimentData data) async {
     try {
       await _supabase.from('dnl_experiment_data').insert(data.toJson());
@@ -22,7 +20,6 @@ class DataService {
   // USER DATA RETRIEVAL
   // ================================================
 
-  /// Get all data for current user
   Future<List<ExperimentData>> getUserData() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -31,7 +28,7 @@ class DataService {
       final response = await _supabase
           .from('dnl_experiment_data')
           .select()
-          .eq('email', user.email!)
+          .match({'email': user.email!})
           .order('created_at', ascending: false);
 
       return (response as List)
@@ -42,7 +39,6 @@ class DataService {
     }
   }
 
-  /// Get user data with search and filter
   Future<List<ExperimentData>> getUserDataFiltered({
     String? searchQuery,
     String? filterApp,
@@ -51,35 +47,46 @@ class DataService {
       final user = _supabase.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
-      var query = _supabase
+      // Start with base query
+      final response = await _supabase
           .from('dnl_experiment_data')
           .select()
-          .eq('email', user.email!)
+          .match({'email': user.email!})
           .order('created_at', ascending: false);
 
+      // Filter in-memory (simpler than complex queries)
+      List<ExperimentData> results = (response as List)
+          .map((item) => ExperimentData.fromJson(item))
+          .toList();
+
+      // Apply search filter
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        query = query.or(
-          'app_name.ilike.%$searchQuery%,observations.ilike.%$searchQuery%',
-        );
+        results = results.where((data) {
+          final appNameMatch =
+              data.appName?.toLowerCase().contains(searchQuery.toLowerCase()) ??
+              false;
+          final obsMatch =
+              data.observations?.toLowerCase().contains(
+                searchQuery.toLowerCase(),
+              ) ??
+              false;
+          return appNameMatch || obsMatch;
+        }).toList();
       }
 
+      // Apply app filter
       if (filterApp != null &&
           filterApp.isNotEmpty &&
           filterApp != 'All Apps') {
-        query = query.eq('app_name', filterApp);
+        results = results.where((data) => data.appName == filterApp).toList();
       }
 
-      final response = await query;
-
-      return (response as List)
-          .map((item) => ExperimentData.fromJson(item))
-          .toList();
+      return results;
     } catch (e) {
       throw Exception('Failed to fetch filtered data: $e');
     }
   }
 
-  /// Get list of apps user has submitted
   Future<List<String>> getUserApps() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -88,10 +95,10 @@ class DataService {
       final response = await _supabase
           .from('dnl_experiment_data')
           .select('app_name')
-          .eq('email', user.email!)
-          .not('app_name', 'is', null);
+          .match({'email': user.email!});
 
       final apps = (response as List)
+          .where((item) => item['app_name'] != null)
           .map((item) => item['app_name'] as String)
           .toSet()
           .toList();
@@ -103,10 +110,9 @@ class DataService {
     }
   }
 
-  /// Delete user submission
   Future<void> deleteSubmission(String id) async {
     try {
-      await _supabase.from('dnl_experiment_data').delete().eq('id', id);
+      await _supabase.from('dnl_experiment_data').delete().match({'id': id});
     } catch (e) {
       throw Exception('Failed to delete submission: $e');
     }
@@ -116,7 +122,6 @@ class DataService {
   // METRICS CALCULATION
   // ================================================
 
-  /// Calculate metrics for current user
   Future<MetricsData> calculateMetrics() async {
     try {
       final userData = await getUserData();
@@ -124,7 +129,7 @@ class DataService {
       if (userData.isEmpty) {
         return MetricsData(
           totalSubmissions: 0,
-          averageReviewScore: 0,
+          averageReviewScore: 0.0,
           appDistribution: {},
           deviceDistribution: {},
           osDistribution: {},
@@ -133,10 +138,8 @@ class DataService {
         );
       }
 
-      // Calculate total submissions
       final totalSubmissions = userData.length;
 
-      // Calculate average review score
       double totalScore = 0;
       int scoreCount = 0;
       for (var data in userData) {
@@ -150,9 +153,10 @@ class DataService {
           }
         }
       }
-      final averageReviewScore = scoreCount > 0 ? totalScore / scoreCount : 0;
+      final averageReviewScore = scoreCount > 0
+          ? (totalScore / scoreCount)
+          : 0.0;
 
-      // Calculate app distribution
       final Map<String, int> appDistribution = {};
       for (var data in userData) {
         if (data.appName != null) {
@@ -161,7 +165,6 @@ class DataService {
         }
       }
 
-      // Calculate device distribution
       final Map<String, int> deviceDistribution = {};
       for (var data in userData) {
         if (data.deviceModel != null) {
@@ -170,7 +173,6 @@ class DataService {
         }
       }
 
-      // Calculate OS distribution
       final Map<String, int> osDistribution = {};
       for (var data in userData) {
         if (data.osType != null) {
@@ -179,7 +181,6 @@ class DataService {
         }
       }
 
-      // Calculate permission frequency
       final Map<String, int> permissionFrequency = {};
       for (var data in userData) {
         for (var permission in data.permissionsAsked) {
@@ -188,7 +189,6 @@ class DataService {
         }
       }
 
-      // Calculate data collection patterns
       final Map<String, int> dataCollectionPatterns = {};
       for (var data in userData) {
         for (var dataType in data.dataLinked) {
@@ -215,81 +215,90 @@ class DataService {
   // ADMIN METHODS
   // ================================================
 
-  /// Get system-wide statistics (admin only)
   Future<Map<String, dynamic>> getAdminSystemStats() async {
     try {
       final response = await _supabase
           .from('admin_system_stats')
           .select()
           .single();
-      return response as Map<String, dynamic>;
+      return response;
     } catch (e) {
       throw Exception('Failed to fetch system stats: $e');
     }
   }
 
-  /// Get all submissions from all users (admin only)
   Future<List<Map<String, dynamic>>> getAllSubmissions({
     String? searchQuery,
     String? filterApp,
-    String? sortBy = 'created_at',
+    String sortBy = 'created_at',
     bool ascending = false,
   }) async {
     try {
-      var query = _supabase
+      final response = await _supabase
           .from('dnl_experiment_data')
           .select()
           .order(sortBy, ascending: ascending);
 
+      List<Map<String, dynamic>> results = List<Map<String, dynamic>>.from(
+        response,
+      );
+
+      // Apply search filter in-memory
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        query = query.or(
-          'app_name.ilike.%$searchQuery%,email.ilike.%$searchQuery%,name.ilike.%$searchQuery%,observations.ilike.%$searchQuery%',
-        );
+        results = results.where((item) {
+          final appName = (item['app_name'] as String?)?.toLowerCase() ?? '';
+          final email = (item['email'] as String?)?.toLowerCase() ?? '';
+          final name = (item['name'] as String?)?.toLowerCase() ?? '';
+          final obs = (item['observations'] as String?)?.toLowerCase() ?? '';
+          final query = searchQuery.toLowerCase();
+          return appName.contains(query) ||
+              email.contains(query) ||
+              name.contains(query) ||
+              obs.contains(query);
+        }).toList();
       }
 
+      // Apply app filter
       if (filterApp != null &&
           filterApp.isNotEmpty &&
           filterApp != 'All Apps') {
-        query = query.eq('app_name', filterApp);
+        results = results
+            .where((item) => item['app_name'] == filterApp)
+            .toList();
       }
 
-      final response = await query;
-      return List<Map<String, dynamic>>.from(response as List);
+      return results;
     } catch (e) {
       throw Exception('Failed to fetch all submissions: $e');
     }
   }
 
-  /// Get all users statistics (admin only)
   Future<List<Map<String, dynamic>>> getAllUsers() async {
     try {
       final response = await _supabase.from('admin_user_stats').select();
-      return List<Map<String, dynamic>>.from(response as List);
+      return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       throw Exception('Failed to fetch user stats: $e');
     }
   }
 
-  /// Get app statistics for DNL generation (admin only)
   Future<List<Map<String, dynamic>>> getAppStats() async {
     try {
       final response = await _supabase.from('admin_app_stats').select();
-      return List<Map<String, dynamic>>.from(response as List);
+      return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       throw Exception('Failed to fetch app stats: $e');
     }
   }
 
-  /// Delete any submission (admin only)
   Future<void> deleteSubmissionAsAdmin(String id) async {
     try {
-      await _supabase.from('dnl_experiment_data').delete().eq('id', id);
+      await _supabase.from('dnl_experiment_data').delete().match({'id': id});
     } catch (e) {
       throw Exception('Failed to delete submission: $e');
     }
   }
 
-  /// Get submission count by date range (admin only)
   Future<List<Map<String, dynamic>>> getSubmissionsByDateRange(
     DateTime startDate,
     DateTime endDate,
@@ -298,17 +307,23 @@ class DataService {
       final response = await _supabase
           .from('dnl_experiment_data')
           .select()
-          .gte('created_at', startDate.toIso8601String())
-          .lte('created_at', endDate.toIso8601String())
           .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response as List);
+      // Filter by date in-memory
+      List<Map<String, dynamic>> results = List<Map<String, dynamic>>.from(
+        response,
+      );
+      results = results.where((item) {
+        final createdAt = DateTime.parse(item['created_at'] as String);
+        return createdAt.isAfter(startDate) && createdAt.isBefore(endDate);
+      }).toList();
+
+      return results;
     } catch (e) {
       throw Exception('Failed to fetch submissions by date: $e');
     }
   }
 
-  /// Export all data as CSV-ready format (admin only)
   Future<List<Map<String, dynamic>>> exportAllData() async {
     try {
       final response = await _supabase
@@ -316,13 +331,12 @@ class DataService {
           .select()
           .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response as List);
+      return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       throw Exception('Failed to export data: $e');
     }
   }
 
-  /// Check if current user is admin
   Future<bool> isAdmin() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -334,4 +348,25 @@ class DataService {
       return false;
     }
   }
+}
+
+// MetricsData class
+class MetricsData {
+  final int totalSubmissions;
+  final double averageReviewScore;
+  final Map<String, int> appDistribution;
+  final Map<String, int> deviceDistribution;
+  final Map<String, int> osDistribution;
+  final Map<String, int> permissionFrequency;
+  final Map<String, int> dataCollectionPatterns;
+
+  MetricsData({
+    required this.totalSubmissions,
+    required this.averageReviewScore,
+    required this.appDistribution,
+    required this.deviceDistribution,
+    required this.osDistribution,
+    required this.permissionFrequency,
+    required this.dataCollectionPatterns,
+  });
 }

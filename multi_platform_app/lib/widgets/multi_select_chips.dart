@@ -7,12 +7,12 @@ class MultiSelectChips extends StatelessWidget {
   final void Function(String) onToggle;
 
   const MultiSelectChips({
-    Key? key,
+    super.key,
     required this.title,
     required this.options,
     required this.selectedValues,
     required this.onToggle,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

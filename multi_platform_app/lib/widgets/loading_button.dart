@@ -9,14 +9,14 @@ class LoadingButton extends StatelessWidget {
   final Color? textColor;
 
   const LoadingButton({
-    Key? key,
+    super.key,
     required this.onPressed,
     required this.text,
     this.isLoading = false,
     this.icon,
     this.backgroundColor,
     this.textColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

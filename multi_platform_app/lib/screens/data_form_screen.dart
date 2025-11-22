@@ -11,7 +11,7 @@ import '../widgets/multi_select_chips.dart';
 import '../widgets/loading_button.dart';
 
 class DataFormScreen extends StatefulWidget {
-  const DataFormScreen({Key? key}) : super(key: key);
+  const DataFormScreen({super.key});
 
   @override
   State<DataFormScreen> createState() => _DataFormScreenState();
@@ -38,10 +38,10 @@ class _DataFormScreenState extends State<DataFormScreen> {
   String? _appName;
 
   // Multi-select values
-  Set<String> _dataLinked = {};
-  Set<String> _dataNotLinked = {};
-  Set<String> _dataTracked = {};
-  Set<String> _permissionsAsked = {};
+  final Set<String> _dataLinked = {};
+  final Set<String> _dataNotLinked = {};
+  final Set<String> _dataTracked = {};
+  final Set<String> _permissionsAsked = {};
 
   // Auto-populated fields
   String? _email;

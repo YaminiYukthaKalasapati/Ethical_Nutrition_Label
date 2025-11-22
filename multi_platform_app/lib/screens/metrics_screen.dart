@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
 import '../services/data_service.dart';
-import '../models/experiment_data.dart';
-import '../utils/constants.dart';
 
 class MetricsScreen extends StatefulWidget {
   const MetricsScreen({super.key});
@@ -12,12 +9,10 @@ class MetricsScreen extends StatefulWidget {
 }
 
 class _MetricsScreenState extends State<MetricsScreen> {
-  final _authService = AuthService();
-  final _dataService = DataService();
-
+  final DataService _dataService = DataService();
+  bool _isLoading = true;
   MetricsData? _metricsData;
-  bool _loading = true;
-  String? _error;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -27,22 +22,25 @@ class _MetricsScreenState extends State<MetricsScreen> {
 
   Future<void> _loadMetrics() async {
     setState(() {
-      _loading = true;
-      _error = null;
+      _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
-      final email = _authService.currentUserEmail ?? '';
-      final metrics = await _dataService.getMetricsData(email);
-      setState(() {
-        _metricsData = metrics;
-        _loading = false;
-      });
+      final metrics = await _dataService.calculateMetrics();
+      if (mounted) {
+        setState(() {
+          _metricsData = metrics;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -52,356 +50,267 @@ class _MetricsScreenState extends State<MetricsScreen> {
       appBar: AppBar(
         title: const Text('Metrics Dashboard'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadMetrics,
-            tooltip: 'Refresh',
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadMetrics),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Failed to load metrics',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: _loadMetrics,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try Again'),
+                  ),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadMetrics,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildOverviewCard(),
+                        const SizedBox(height: 24),
+                        _buildDistributionSection(
+                          'App Distribution',
+                          _metricsData!.appDistribution,
+                          Icons.apps,
+                          Colors.blue,
+                        ),
+                        const SizedBox(height: 24),
+                        _buildDistributionSection(
+                          'Device Distribution',
+                          _metricsData!.deviceDistribution,
+                          Icons.devices,
+                          Colors.green,
+                        ),
+                        const SizedBox(height: 24),
+                        _buildDistributionSection(
+                          'OS Distribution',
+                          _metricsData!.osDistribution,
+                          Icons.settings,
+                          Colors.orange,
+                        ),
+                        const SizedBox(height: 24),
+                        _buildDistributionSection(
+                          'Permission Frequency',
+                          _metricsData!.permissionFrequency,
+                          Icons.security,
+                          Colors.red,
+                        ),
+                        const SizedBox(height: 24),
+                        _buildDistributionSection(
+                          'Data Collection Patterns',
+                          _metricsData!.dataCollectionPatterns,
+                          Icons.data_usage,
+                          Colors.purple,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildOverviewCard() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.teal.shade400, Colors.teal.shade600],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(0, 150, 136, 0.3),
+            blurRadius: 10,
+            offset: Offset(0, 5),
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? _buildErrorState()
-          : _metricsData == null || _metricsData!.totalSubmissions == 0
-          ? _buildEmptyState()
-          : _buildMetricsContent(),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: AppConstants.largePadding,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load metrics',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _error ?? 'Unknown error',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _loadMetrics,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: AppConstants.largePadding,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.analytics_outlined,
-              size: 64,
-              color: Colors.teal.shade300,
-            ),
-            const SizedBox(height: 16),
-            Text('No Data Yet', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(
-              'Submit some data to see your metrics',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.pushNamed(context, '/form'),
-              icon: const Icon(Icons.add),
-              label: const Text('Submit Data'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricsContent() {
-    return RefreshIndicator(
-      onRefresh: _loadMetrics,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: AppConstants.defaultPadding,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppConstants.maxContentWidth,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Summary cards
-                _buildSummaryCards(),
-                const SizedBox(height: 24),
-
-                // App distribution
-                _buildSectionTitle('App Distribution'),
-                _buildDistributionCard(
-                  _metricsData!.appDistribution,
-                  Icons.apps,
-                  Colors.blue,
-                ),
-                const SizedBox(height: 24),
-
-                // Device distribution
-                _buildSectionTitle('Device Distribution'),
-                _buildDistributionCard(
-                  _metricsData!.deviceDistribution,
-                  Icons.phone_android,
-                  Colors.green,
-                ),
-                const SizedBox(height: 24),
-
-                // OS distribution
-                _buildSectionTitle('OS Distribution'),
-                _buildDistributionCard(
-                  _metricsData!.osDistribution,
-                  Icons.computer,
-                  Colors.orange,
-                ),
-                const SizedBox(height: 24),
-
-                // Permissions frequency
-                _buildSectionTitle('Most Requested Permissions'),
-                _buildFrequencyCard(
-                  _metricsData!.permissionsFrequency,
-                  Icons.lock_outline,
-                  Colors.purple,
-                ),
-                const SizedBox(height: 24),
-
-                // Data linked frequency
-                _buildSectionTitle('Most Common Linked Data'),
-                _buildFrequencyCard(
-                  _metricsData!.dataLinkedFrequency,
-                  Icons.link,
-                  Colors.red,
-                ),
-              ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Overview',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildOverviewStat(
+                'Total Submissions',
+                '${_metricsData!.totalSubmissions}',
+                Icons.file_copy,
+              ),
+              _buildOverviewStat(
+                'Avg Review Score',
+                _metricsData!.averageReviewScore.toStringAsFixed(1),
+                Icons.star,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: Colors.teal.shade900,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryCards() {
-    return Row(
+  Widget _buildOverviewStat(String label, String value, IconData icon) {
+    return Column(
       children: [
-        Expanded(
-          child: _buildSummaryCard(
-            'Total Submissions',
-            _metricsData!.totalSubmissions.toString(),
-            Icons.assessment,
-            Colors.teal,
+        Icon(icon, color: Colors.white, size: 32),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildSummaryCard(
-            'Avg Review Score',
-            _metricsData!.averageReviewScore.toStringAsFixed(1),
-            Icons.star,
-            Colors.amber,
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color.fromRGBO(255, 255, 255, 0.9),
+            fontSize: 14,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSummaryCard(
+  Widget _buildDistributionSection(
     String title,
-    String value,
+    Map<String, int> data,
     IconData icon,
     Color color,
   ) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDistributionCard(
-    Map<String, int> distribution,
-    IconData icon,
-    Color color,
-  ) {
-    if (distribution.isEmpty) {
+    if (data.isEmpty) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Text(
-            'No data available',
-            style: TextStyle(color: Colors.grey.shade600),
-          ),
-        ),
-      );
-    }
-
-    final sortedEntries = distribution.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final total = distribution.values.reduce((a, b) => a + b);
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: sortedEntries.map((entry) {
-            final percentage = (entry.value / total * 100).toStringAsFixed(1);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          entry.key,
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                      Text(
-                        '${entry.value} ($percentage%)',
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: entry.value / total,
-                      backgroundColor: Colors.grey.shade200,
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
-                      minHeight: 8,
+                  Icon(icon, color: color),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFrequencyCard(
-    Map<String, int> frequency,
-    IconData icon,
-    Color color,
-  ) {
-    if (frequency.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            'No data available',
-            style: TextStyle(color: Colors.grey.shade600),
+              const SizedBox(height: 16),
+              const Center(
+                child: Text(
+                  'No data available',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+            ],
           ),
         ),
       );
     }
 
-    final sortedEntries = frequency.entries.toList()
+    // Sort by frequency
+    final sortedEntries = data.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final topEntries = sortedEntries.take(5).toList();
 
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          children: topEntries.map((entry) {
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: color.withOpacity(0.1),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              title: Text(entry.key),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...sortedEntries.map((entry) {
+              final percentage = (_metricsData!.totalSubmissions > 0)
+                  ? (entry.value / _metricsData!.totalSubmissions * 100)
+                  : 0.0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            entry.key,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        Text(
+                          '${entry.value} (${percentage.toStringAsFixed(1)}%)',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: percentage / 100,
+                        backgroundColor: Colors.grey.shade200,
+                        valueColor: AlwaysStoppedAnimation<Color>(color),
+                        minHeight: 8,
+                      ),
+                    ),
+                  ],
                 ),
-                child: Text(
-                  entry.value.toString(),
-                  style: TextStyle(color: color, fontWeight: FontWeight.bold),
-                ),
-              ),
-            );
-          }).toList(),
+              );
+            }),
+          ],
         ),
       ),
     );
