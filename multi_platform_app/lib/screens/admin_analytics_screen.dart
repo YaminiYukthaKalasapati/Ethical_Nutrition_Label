@@ -231,7 +231,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       crossAxisCount: 2,
       mainAxisSpacing: 16,
       crossAxisSpacing: 16,
-      childAspectRatio: 1.5,
+      childAspectRatio:
+          1.4, // FIXED: Changed from 1.5 to 1.4 for slightly more height
       children: [
         _buildStatCard(
           'Total Submissions',
@@ -268,7 +269,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14), // FIXED: Reduced from 20 to 14
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [color, color.withOpacity(0.7)],
@@ -287,21 +288,34 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 36, color: Colors.white),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          Icon(
+            icon,
+            size: 30,
+            color: Colors.white,
+          ), // FIXED: Reduced from 36 to 30
+          const SizedBox(height: 8), // FIXED: Reduced from 12 to 8
+          FittedBox(
+            // FIXED: Added FittedBox to prevent text overflow
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 24, // FIXED: Reduced from 28 to 24
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             title,
-            style: const TextStyle(fontSize: 14, color: Colors.white),
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.white,
+            ), // FIXED: Reduced from 14 to 13
             textAlign: TextAlign.center,
+            maxLines: 2, // FIXED: Added maxLines to prevent overflow
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -326,7 +340,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
               subtitle,
               style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             chart,
           ],
         ),
@@ -342,36 +356,38 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       );
     }
 
-    // Sort and take top 10
     final sortedApps = _appDistribution.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final top10 = sortedApps.take(10).toList();
+    final top5 = sortedApps.take(5).toList();
+
+    final maxValue = top5.map((e) => e.value).reduce((a, b) => a > b ? a : b);
 
     return SizedBox(
-      height: 300,
+      height: 250,
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          maxY: top10.first.value.toDouble() * 1.2,
-          barTouchData: BarTouchData(enabled: true),
+          maxY: maxValue.toDouble() * 1.2,
+          barTouchData: BarTouchData(enabled: false),
           titlesData: FlTitlesData(
             show: true,
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
-                  if (value.toInt() >= top10.length) return const Text('');
-                  final appName = top10[value.toInt()].key;
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      appName.length > 15
-                          ? '${appName.substring(0, 15)}...'
-                          : appName,
-                      style: const TextStyle(fontSize: 10),
-                      textAlign: TextAlign.center,
-                    ),
-                  );
+                  if (value.toInt() >= 0 && value.toInt() < top5.length) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        top5[value.toInt()].key,
+                        style: const TextStyle(fontSize: 10),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }
+                  return const Text('');
                 },
               ),
             ),
@@ -380,7 +396,10 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                 showTitles: true,
                 reservedSize: 40,
                 getTitlesWidget: (value, meta) {
-                  return Text(value.toInt().toString());
+                  return Text(
+                    value.toInt().toString(),
+                    style: const TextStyle(fontSize: 10),
+                  );
                 },
               ),
             ),
@@ -392,23 +411,36 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
             ),
           ),
           borderData: FlBorderData(show: false),
-          barGroups: List.generate(
-            top10.length,
-            (index) => BarChartGroupData(
-              x: index,
-              barRods: [
-                BarChartRodData(
-                  toY: top10[index].value.toDouble(),
-                  color: Colors.blue,
-                  width: 20,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(6),
-                    topRight: Radius.circular(6),
-                  ),
-                ),
-              ],
-            ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (value) {
+              return FlLine(color: Colors.grey.shade200, strokeWidth: 1);
+            },
           ),
+          barGroups: top5
+              .asMap()
+              .entries
+              .map(
+                (entry) => BarChartGroupData(
+                  x: entry.key,
+                  barRods: [
+                    BarChartRodData(
+                      toY: entry.value.value.toDouble(),
+                      gradient: LinearGradient(
+                        colors: [Colors.blue.shade400, Colors.blue.shade700],
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                      ),
+                      width: 40,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(6),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              .toList(),
         ),
       ),
     );

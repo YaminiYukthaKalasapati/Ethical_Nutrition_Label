@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../services/auth_service.dart';
 import '../utils/validators.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/loading_button.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -11,16 +10,27 @@ class RegistrationScreen extends StatefulWidget {
   State createState() => _RegistrationScreenState();
 }
 
-class _RegistrationScreenState extends State<RegistrationScreen> {
+class _RegistrationScreenState extends State<RegistrationScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _authService = AuthService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _fullNameController = TextEditingController();
+  late AnimationController _animationController;
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: Duration(milliseconds: 1500),
+      vsync: this,
+    )..forward();
+  }
 
   @override
   void dispose() {
@@ -28,6 +38,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _fullNameController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -40,7 +51,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     try {
       final response = await _authService.signUp(
-        email: _emailController.text,
+        email: _emailController.text.trim(),
         password: _passwordController.text,
         metadata: {'full_name': _fullNameController.text.trim()},
       );
@@ -78,7 +89,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.white),
+            SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
       ),
@@ -90,6 +107,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             Icon(Icons.check_circle, color: Colors.green, size: 30),
@@ -116,154 +134,438 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Register'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Welcome text
-                  Text(
-                    'Create Account',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.teal.shade900,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sign up to get started',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Full name field
-                  CustomTextField(
-                    controller: _fullNameController,
-                    labelText: 'Full Name',
-                    hintText: 'Enter your full name',
-                    prefixIcon: Icons.person_outline,
-                    validator: (value) =>
-                        Validators.validateRequired(value, 'Full name'),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Email field
-                  CustomTextField(
-                    controller: _emailController,
-                    labelText: 'Email',
-                    hintText: 'Enter your email',
-                    keyboardType: TextInputType.emailAddress,
-                    prefixIcon: Icons.email_outlined,
-                    validator: Validators.validateEmail,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Password field
-                  CustomTextField(
-                    controller: _passwordController,
-                    labelText: 'Password',
-                    hintText: 'Enter your password',
-                    obscureText: _obscurePassword,
-                    prefixIcon: Icons.lock_outline,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
-                    ),
-                    validator: Validators.validatePassword,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Confirm password field
-                  CustomTextField(
-                    controller: _confirmPasswordController,
-                    labelText: 'Confirm Password',
-                    hintText: 'Re-enter your password',
-                    obscureText: _obscureConfirmPassword,
-                    prefixIcon: Icons.lock_outline,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
-                      onPressed: () {
-                        setState(
-                          () => _obscureConfirmPassword =
-                              !_obscureConfirmPassword,
-                        );
-                      },
-                    ),
-                    validator: (value) => Validators.validateConfirmPassword(
-                      value,
-                      _passwordController.text,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Register button
-                  LoadingButton(
-                    onPressed: _handleRegister,
-                    text: 'Register',
-                    isLoading: _isLoading,
-                    icon: Icons.person_add,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Divider
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: Colors.grey.shade400)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'OR',
-                          style: TextStyle(color: Colors.grey.shade600),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF00796B), Color(0xFF00BFA5), Color(0xFF4DD0E1)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Logo/Icon
+                    Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 20,
+                                spreadRadius: 5,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.person_add,
+                            size: 50,
+                            color: Color(0xFF00BFA5),
+                          ),
+                        )
+                        .animate()
+                        .fadeIn(duration: 600.ms)
+                        .scale(
+                          begin: Offset(0.8, 0.8),
+                          end: Offset(1, 1),
+                          curve: Curves.easeOutBack,
                         ),
-                      ),
-                      Expanded(child: Divider(color: Colors.grey.shade400)),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
 
-                  // Login link
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Already have an account? ',
-                        style: TextStyle(color: Colors.grey.shade700),
-                      ),
-                      TextButton(
-                        onPressed: () =>
-                            Navigator.pushReplacementNamed(context, '/login'),
-                        child: const Text(
-                          'Login',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                    SizedBox(height: 30),
+
+                    // Registration Card
+                    Container(
+                          padding: EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 20,
+                                offset: Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                      'Create Account',
+                                      style: TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF00796B),
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    )
+                                    .animate()
+                                    .fadeIn(delay: 200.ms, duration: 600.ms)
+                                    .slideY(begin: -0.2, end: 0),
+
+                                SizedBox(height: 8),
+
+                                Text(
+                                  'Sign up to get started',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ).animate().fadeIn(
+                                  delay: 300.ms,
+                                  duration: 600.ms,
+                                ),
+
+                                SizedBox(height: 24),
+
+                                // Full Name Field
+                                TextFormField(
+                                      controller: _fullNameController,
+                                      decoration: InputDecoration(
+                                        labelText: 'Full Name',
+                                        hintText: 'Enter your full name',
+                                        prefixIcon: Icon(
+                                          Icons.person_outline,
+                                          color: Color(0xFF00796B),
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Colors.grey.shade300,
+                                          ),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Color(0xFF00BFA5),
+                                            width: 2,
+                                          ),
+                                        ),
+                                        filled: true,
+                                        fillColor: Colors.grey.shade50,
+                                      ),
+                                      validator: (value) =>
+                                          Validators.validateRequired(
+                                            value,
+                                            'Full name',
+                                          ),
+                                    )
+                                    .animate()
+                                    .fadeIn(delay: 400.ms, duration: 600.ms)
+                                    .slideX(begin: -0.2, end: 0),
+
+                                SizedBox(height: 16),
+
+                                // Email Field
+                                TextFormField(
+                                      controller: _emailController,
+                                      keyboardType: TextInputType.emailAddress,
+                                      decoration: InputDecoration(
+                                        labelText: 'Email',
+                                        hintText: 'Enter your email',
+                                        prefixIcon: Icon(
+                                          Icons.email_outlined,
+                                          color: Color(0xFF00796B),
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Colors.grey.shade300,
+                                          ),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Color(0xFF00BFA5),
+                                            width: 2,
+                                          ),
+                                        ),
+                                        filled: true,
+                                        fillColor: Colors.grey.shade50,
+                                      ),
+                                      validator: Validators.validateEmail,
+                                    )
+                                    .animate()
+                                    .fadeIn(delay: 500.ms, duration: 600.ms)
+                                    .slideX(begin: 0.2, end: 0),
+
+                                SizedBox(height: 16),
+
+                                // Password Field
+                                TextFormField(
+                                      controller: _passwordController,
+                                      obscureText: _obscurePassword,
+                                      decoration: InputDecoration(
+                                        labelText: 'Password',
+                                        hintText: 'Enter your password',
+                                        prefixIcon: Icon(
+                                          Icons.lock_outline,
+                                          color: Color(0xFF00796B),
+                                        ),
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _obscurePassword
+                                                ? Icons.visibility_outlined
+                                                : Icons.visibility_off_outlined,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          onPressed: () {
+                                            setState(
+                                              () => _obscurePassword =
+                                                  !_obscurePassword,
+                                            );
+                                          },
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Colors.grey.shade300,
+                                          ),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Color(0xFF00BFA5),
+                                            width: 2,
+                                          ),
+                                        ),
+                                        filled: true,
+                                        fillColor: Colors.grey.shade50,
+                                      ),
+                                      validator: Validators.validatePassword,
+                                    )
+                                    .animate()
+                                    .fadeIn(delay: 600.ms, duration: 600.ms)
+                                    .slideX(begin: -0.2, end: 0),
+
+                                SizedBox(height: 16),
+
+                                // Confirm Password Field
+                                TextFormField(
+                                      controller: _confirmPasswordController,
+                                      obscureText: _obscureConfirmPassword,
+                                      decoration: InputDecoration(
+                                        labelText: 'Confirm Password',
+                                        hintText: 'Re-enter your password',
+                                        prefixIcon: Icon(
+                                          Icons.lock_outline,
+                                          color: Color(0xFF00796B),
+                                        ),
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _obscureConfirmPassword
+                                                ? Icons.visibility_outlined
+                                                : Icons.visibility_off_outlined,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          onPressed: () {
+                                            setState(
+                                              () => _obscureConfirmPassword =
+                                                  !_obscureConfirmPassword,
+                                            );
+                                          },
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Colors.grey.shade300,
+                                          ),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Color(0xFF00BFA5),
+                                            width: 2,
+                                          ),
+                                        ),
+                                        filled: true,
+                                        fillColor: Colors.grey.shade50,
+                                      ),
+                                      validator: (value) =>
+                                          Validators.validateConfirmPassword(
+                                            value,
+                                            _passwordController.text,
+                                          ),
+                                    )
+                                    .animate()
+                                    .fadeIn(delay: 700.ms, duration: 600.ms)
+                                    .slideX(begin: 0.2, end: 0),
+
+                                SizedBox(height: 24),
+
+                                // Register Button
+                                AnimatedContainer(
+                                      duration: Duration(milliseconds: 300),
+                                      height: 56,
+                                      child: ElevatedButton(
+                                        onPressed: _isLoading
+                                            ? null
+                                            : _handleRegister,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Color(0xFF00BFA5),
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          elevation: _isLoading ? 0 : 5,
+                                          shadowColor: Color(
+                                            0xFF00BFA5,
+                                          ).withOpacity(0.3),
+                                        ),
+                                        child: _isLoading
+                                            ? Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  SizedBox(
+                                                    width: 20,
+                                                    height: 20,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                            Color
+                                                          >(Colors.white),
+                                                    ),
+                                                  ),
+                                                  SizedBox(width: 12),
+                                                  Text(
+                                                    'Creating Account...',
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            : Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(
+                                                    Icons.person_add,
+                                                    size: 20,
+                                                  ),
+                                                  SizedBox(width: 12),
+                                                  Text(
+                                                    'Register',
+                                                    style: TextStyle(
+                                                      fontSize: 18,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                      ),
+                                    )
+                                    .animate()
+                                    .fadeIn(delay: 800.ms, duration: 600.ms)
+                                    .slideY(begin: 0.2, end: 0),
+
+                                SizedBox(height: 24),
+
+                                // Divider
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Divider(
+                                        color: Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: Text(
+                                        'OR',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Divider(
+                                        color: Colors.grey.shade300,
+                                      ),
+                                    ),
+                                  ],
+                                ).animate().fadeIn(
+                                  delay: 900.ms,
+                                  duration: 600.ms,
+                                ),
+
+                                SizedBox(height: 24),
+
+                                // Login Link
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Already have an account? ',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pushReplacementNamed(
+                                            context,
+                                            '/login',
+                                          ),
+                                      child: Text(
+                                        'Login',
+                                        style: TextStyle(
+                                          color: Color(0xFF00BFA5),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ).animate().fadeIn(
+                                  delay: 1000.ms,
+                                  duration: 600.ms,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .animate()
+                        .fadeIn(delay: 100.ms, duration: 800.ms)
+                        .slideY(begin: 0.1, end: 0),
+                  ],
+                ),
               ),
             ),
           ),
