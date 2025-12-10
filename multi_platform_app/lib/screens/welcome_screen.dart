@@ -3,6 +3,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../screens/login_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
+  const WelcomeScreen({super.key});
+
   @override
   _WelcomeScreenState createState() => _WelcomeScreenState();
 }

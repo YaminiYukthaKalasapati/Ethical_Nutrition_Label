@@ -85,7 +85,7 @@ class _DNLLabelDisplayScreenState extends State<DNLLabelDisplayScreen> {
       );
 
       // Generate PDF
-      final pdf = await _generatePDF();
+      final pdf = _generatePDF();
 
       // Close loading dialog
       if (mounted) {
@@ -124,7 +124,7 @@ class _DNLLabelDisplayScreenState extends State<DNLLabelDisplayScreen> {
     if (_aggregatedData == null) return;
 
     try {
-      final pdf = await _generatePDF();
+      final pdf = _generatePDF();
 
       await Printing.sharePdf(
         bytes: await pdf.save(),

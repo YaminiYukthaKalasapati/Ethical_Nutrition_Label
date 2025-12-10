@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/data_service.dart';
 import 'package:intl/intl.dart';
-import '../screens/login_screen.dart';
+
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -278,7 +278,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _sortBy,
+                    initialValue: _sortBy,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(

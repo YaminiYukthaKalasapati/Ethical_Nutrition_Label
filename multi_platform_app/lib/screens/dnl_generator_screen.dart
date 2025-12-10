@@ -393,7 +393,7 @@ class _DNLGeneratorScreenState extends State<DNLGeneratorScreen>
           ),
           SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _selectedApp,
+            initialValue: _selectedApp,
             decoration: InputDecoration(
               labelText: 'Select App',
               border: OutlineInputBorder(

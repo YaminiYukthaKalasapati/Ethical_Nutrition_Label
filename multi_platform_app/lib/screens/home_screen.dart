@@ -20,7 +20,7 @@ class _HomeScreenState extends State<HomeScreen>
   // Add more stats for dashboard
   int _appsTestd = 0;
   double _avgReviewScore = 0.0;
-  Map<String, dynamic> _recentActivity = {};
+  final Map<String, dynamic> _recentActivity = {};
 
   @override
   void initState() {

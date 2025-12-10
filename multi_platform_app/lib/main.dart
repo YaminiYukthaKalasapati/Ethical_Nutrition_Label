@@ -15,7 +15,6 @@ import 'screens/admin_all_submissions_screen.dart';
 import 'screens/admin_users_screen.dart';
 import 'screens/admin_analytics_screen.dart';
 import 'screens/dnl_generator_screen.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

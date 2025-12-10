@@ -341,7 +341,7 @@ class _AdminAllSubmissionsScreenState extends State<AdminAllSubmissionsScreen> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedApp,
+                        initialValue: _selectedApp,
                         decoration: InputDecoration(
                           labelText: 'Filter by App',
                           border: OutlineInputBorder(
@@ -366,7 +366,7 @@ class _AdminAllSubmissionsScreenState extends State<AdminAllSubmissionsScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _sortBy,
+                        initialValue: _sortBy,
                         decoration: InputDecoration(
                           labelText: 'Sort by',
                           border: OutlineInputBorder(
